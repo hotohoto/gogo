@@ -66,8 +66,8 @@ $$
 
 ## TODO
 
-- Add ResNet
 - Add TensorBoardX
+- Add ResNet
 - Replace game logic with openai gym - gomoku
 - Replace game logic with openai gym - go
 

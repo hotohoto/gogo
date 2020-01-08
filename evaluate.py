@@ -7,7 +7,7 @@ from collections import defaultdict
 from config import Config
 from game import Game
 from mcts_alphaZero import MCTSPlayer
-from mcts_pure import MCTSPurePlayer as MCTSPurePlayer
+from mcts_pure import MCTSPurePlayer
 from policy_value_net_pytorch import PolicyValueNet
 
 
@@ -16,7 +16,7 @@ def get_pure_mcts_player():
     return pure_mcts_player
 
 
-def evaluate_policy(game, my_player, opponent_player=None, n_games=5):
+def evaluate_policy(game, my_player, opponent_player=None, n_games=10):
     """
     Evaluate the trained policy by playing against another player
     Note: this is only for monitoring the progress of training
@@ -32,7 +32,7 @@ def evaluate_policy(game, my_player, opponent_player=None, n_games=5):
         )
         win_cnt[winner] += 1
     win_ratio = 1.0 * (win_cnt[0] + 0.5 * win_cnt[1]) / n_games
-    print(f"win: {win_cnt[0]}, lose: {win_cnt[1]}, draw:{win_cnt[None]}")
+    print(f"win: {win_cnt[0]}, lose: {win_cnt[1]}, draw: {win_cnt[None]}")
     return win_ratio
 
 

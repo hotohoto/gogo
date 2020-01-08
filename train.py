@@ -20,8 +20,6 @@ class TrainPipeline:
         self.config = config
         self.game = Game.from_config(config)
         # training params
-        self.learn_rate = 2e-3
-        self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.0  # the temperature param
         self.buffer_size = 10000
         self.batch_size = 512  # mini-batch size for training
@@ -89,10 +87,7 @@ class TrainPipeline:
         old_probs, old_v = self.policy_value_net.policy_value(state_batch)
         for _ in range(self.epochs):
             loss, entropy = self.policy_value_net.train_step(
-                state_batch,
-                mcts_probs_batch,
-                winner_batch,
-                self.learn_rate * self.lr_multiplier,
+                state_batch, mcts_probs_batch, winner_batch
             )
             new_probs, new_v = self.policy_value_net.policy_value(state_batch)
             kl = np.mean(
@@ -103,11 +98,6 @@ class TrainPipeline:
             )
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
-        # adaptively adjust the learning rate
-        if kl > self.kl_targ * 2 and self.lr_multiplier > 0.1:
-            self.lr_multiplier /= 1.5
-        elif kl < self.kl_targ / 2 and self.lr_multiplier < 10:
-            self.lr_multiplier *= 1.5
 
         explained_var_old = 1 - np.var(
             np.array(winner_batch) - old_v.flatten()
@@ -118,18 +108,12 @@ class TrainPipeline:
         print(
             (
                 "kl:{:.5f},"
-                "lr_multiplier:{:.3f},"
                 "loss:{},"
                 "entropy:{},"
                 "explained_var_old:{:.3f},"
                 "explained_var_new:{:.3f}"
             ).format(
-                kl,
-                self.lr_multiplier,
-                loss,
-                entropy,
-                explained_var_old,
-                explained_var_new,
+                kl, loss, entropy, explained_var_old, explained_var_new,
             )
         )
         return loss, entropy
@@ -166,6 +150,10 @@ class TrainPipeline:
             print("\n\rquit")
 
 
-if __name__ == "__main__":
+def main():
     training_pipeline = TrainPipeline(Config.from_args())
     training_pipeline.run()
+
+
+if __name__ == "__main__":
+    main()

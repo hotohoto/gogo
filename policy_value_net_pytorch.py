@@ -7,12 +7,6 @@ from torch.autograd import Variable
 import numpy as np
 
 
-def set_learning_rate(optimizer, lr):
-    """Sets the learning rate to the given value"""
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-
 class Net(nn.Module):
     """policy-value network module"""
 
@@ -113,7 +107,7 @@ class PolicyValueNet:
         value = value.data[0][0]
         return act_probs, value
 
-    def train_step(self, state_batch, mcts_probs, winner_batch, lr):
+    def train_step(self, state_batch, mcts_probs, winner_batch):
         """perform a training step"""
         # wrap in Variable
         if self.use_gpu:
@@ -127,8 +121,6 @@ class PolicyValueNet:
 
         # zero the parameter gradients
         self.optimizer.zero_grad()
-        # set learning rate
-        set_learning_rate(self.optimizer, lr)
 
         # forward
         log_act_probs, value = self.policy_value_net(state_batch)
