@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+
 import random
-import numpy as np
 from collections import defaultdict, deque
+
+import numpy as np
+
+from config import Config
 from game import Board, Game
-from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
+from mcts_pure import MCTSPlayer as MCTS_Pure
 from policy_value_net_pytorch import PolicyValueNet
 
 
 class TrainPipeline():
-    def __init__(self, init_model=None):
+    def __init__(self, config: Config):
         # params of the board and the game
-        self.board_width = 6
-        self.board_height = 6
-        self.n_in_row = 4
-        self.board = Board(width=self.board_width,
-                           height=self.board_height,
-                           n_in_row=self.n_in_row)
+        self.config = config
+        self.board = Board(width=self.config.width,
+                           height=self.config.height,
+                           n_in_row=self.config.game_n_row)
         self.game = Game(self.board)
         # training params
         self.learn_rate = 2e-3
@@ -38,19 +40,17 @@ class TrainPipeline():
         # num of simulations used for the pure mcts, which is used as
         # the opponent to evaluate the trained policy
         self.pure_mcts_playout_num = 1000
-        if init_model:
-            # start training from an initial policy-value net
-            self.policy_value_net = PolicyValueNet(self.board_width,
-                                                   self.board_height,
-                                                   model_file=init_model)
-        else:
-            # start training from a new policy-value net
-            self.policy_value_net = PolicyValueNet(self.board_width,
-                                                   self.board_height)
-        self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
-                                      c_puct=self.c_puct,
-                                      n_playout=self.n_playout,
-                                      is_selfplay=1)
+        self.policy_value_net = PolicyValueNet(
+            self.config.width,
+            self.config.height,
+            model_file=config.model_file
+        )
+        self.mcts_player = MCTSPlayer(
+            self.policy_value_net.policy_value_fn,
+            c_puct=self.c_puct,
+            n_playout=self.n_playout,
+            is_selfplay=1
+        )
 
     def get_equi_data(self, play_data):
         """augment the data set by rotation and flipping
@@ -62,7 +62,7 @@ class TrainPipeline():
                 # rotate counterclockwise
                 equi_state = np.array([np.rot90(s, i) for s in state])
                 equi_mcts_prob = np.rot90(np.flipud(
-                    mcts_porb.reshape(self.board_height, self.board_width)), i)
+                    mcts_porb.reshape(self.config.height, self.config.width)), i)
                 extend_data.append((equi_state,
                                     np.flipud(equi_mcts_prob).flatten(),
                                     winner))
@@ -168,12 +168,16 @@ class TrainPipeline():
                 if (i+1) % self.check_freq == 0:
                     print("current self-play batch: {}".format(i+1))
                     win_ratio = self.policy_evaluate()
-                    self.policy_value_net.save_model('./current_policy.model')
+                    self.policy_value_net.save_model(
+                        self.config.get_current_model_name()
+                    )
                     if win_ratio > self.best_win_ratio:
                         print("New best policy!!!!!!!!")
                         self.best_win_ratio = win_ratio
                         # update the best_policy
-                        self.policy_value_net.save_model('./best_policy.model')
+                        self.policy_value_net.save_model(
+                            self.config.get_best_model_name()
+                        )
                         if (self.best_win_ratio == 1.0 and
                                 self.pure_mcts_playout_num < 5000):
                             self.pure_mcts_playout_num += 1000
@@ -183,5 +187,5 @@ class TrainPipeline():
 
 
 if __name__ == '__main__':
-    training_pipeline = TrainPipeline()
+    training_pipeline = TrainPipeline(Config.from_args())
     training_pipeline.run()

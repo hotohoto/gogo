@@ -1,16 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-human VS AI models
-Input your move in the format: 2,3
-
-@author: Junxiao Song
-"""
-
 from __future__ import print_function
-import pickle
+
+from config import Config
 from game import Board, Game
-from mcts_pure import MCTSPlayer as MCTS_Pure
 from mcts_alphaZero import MCTSPlayer
+from mcts_pure import MCTSPlayer as MCTS_Pure
 from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 
 
@@ -42,18 +36,15 @@ class Human(object):
         return "Human {}".format(self.player)
 
 
-def run():
-    n = 4
-    width, height = 6, 6
-    model_file = 'best_policy.model'
+def run(config):
     try:
-        board = Board(width=width, height=height, n_in_row=n)
+        board = Board(width=config.width, height=config.height, n_in_row=config.game_n_row)
         game = Game(board)
 
         # ############### human VS AI ###################
         # load the trained policy_value_net in PyTorch
 
-        best_policy = PolicyValueNet(width, height, model_file=model_file)
+        best_policy = PolicyValueNet(config.width, config.height, model_file=config.model_file)
         mcts_player = MCTSPlayer(best_policy.policy_value_fn,
                                  c_puct=5,
                                  n_playout=400)  # set larger n_playout for better performance
@@ -71,4 +62,4 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    run(Config.from_args())
