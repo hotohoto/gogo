@@ -13,37 +13,40 @@ class Human(object):
     """
 
     def __init__(self):
-        self.player = None
+        self.id = None
 
-    def set_player_ind(self, p):
-        self.player = p
+    def set_id(self, id):
+        self.id = id
 
     def get_action(self, board):
         try:
             location = input("Your move: ")
-            if isinstance(location, str):  # for python3
-                location = [int(n, 10) for n in location.split(",")]
+            location = [int(n, 10) for n in location.split(",")]
             move = board.location_to_move(location)
-        except Exception as e:
-            move = -1
-        if move == -1 or move not in board.availables:
+        except Exception:  # pylint: disable=broad-except
+            move = None
+        if move is None or move not in board.availables:
             print("invalid move")
             move = self.get_action(board)
-        return move
+        return move, None
 
     def __str__(self):
-        return "Human {}".format(self.player)
+        return "Human {}".format(self.id)
 
 
 def main(config):
     try:
-        board = Board(width=config.width, height=config.height, n_in_row=config.game_n_row)
+        board = Board(
+            width=config.width, height=config.height, n_in_row=config.game_n_row
+        )
         game = Game(board)
 
         # ############### human VS AI ###################
         # load the trained policy_value_net in PyTorch
 
-        best_policy = PolicyValueNet(config.width, config.height, model_file=config.model_file)
+        best_policy = PolicyValueNet(
+            config.width, config.height, model_file=config.model_file
+        )
         mcts_player = MCTSPlayer(
             best_policy.policy_value_fn,
             c_puct=config.c_puct,
@@ -54,10 +57,10 @@ def main(config):
         human = Human()
 
         # set start_player=0 for human first
-        game.start_play(human, mcts_player, start_player=1, is_shown=1)
+        game.start_play(human, mcts_player, start_player=0, display=1)
     except KeyboardInterrupt:
-        print('\n\rquit')
+        print("\n\rquit")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(Config.from_args())

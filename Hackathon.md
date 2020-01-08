@@ -1,26 +1,10 @@
-## Plan
-
-(Schedule)
-
-- ~ 11 read articles
-- ~ 12 read source code
-- ~ 12:30 lunch
-- ~ 13 apply openai gym for gomoku
-- ~ 14 apply openai gym for go
-- ~ 17 be ready to train
-- ~ 18 train
-- ~ 19 meet-up
-
-(details)
-
-- ~ 7x7 go
-
 # AlphaZero
 
-- uses a modified Monte-Carlo Tree Search (MCTS) backed by a deep residual neural network (or "ResNet")
-- chooses moves selected by MCTS
+- modified MCTS backed by ResNet
+- which means it chooses moves selected by MCTS
 - plays against itself
 - no hard-coding except the game rules
+- but still there are a lot of hyper parameters
 
 ## Comparing to AlphaGoZero
 
@@ -48,10 +32,11 @@
 
 ## AlphaZero_Gomoku
 
-- 6 by 6 board with 4 stones in a row to win the game
-- 8 by 8 board with 5 stones in a row to win the game
+- 6 by 6 board
+- requires 4 stones in a row to win the game
+- no ResNet
 
-## ResNet
+## ResNet (deep residual neural network)
 
 - outputs
   - estimated value $v$ of the position from 1 to -1
@@ -70,15 +55,21 @@ $$
 $$
 
 $$
-l = (z - v)^2 - \pi^{T}logp + c||\theta||^2
+l = (z - v)^2 - \pi^{T}\log p + c||\theta||^2
 $$
 
 
-## MCTS
+## MCTS (Monte-Carlo Tree Search)
 
 
 
 
+## TODO
+
+- Add ResNet
+- Add TensorBoardX
+- Replace game logic with openai gym - gomoku
+- Replace game logic with openai gym - go
 
 ## References
 

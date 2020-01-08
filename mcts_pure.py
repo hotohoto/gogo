@@ -5,9 +5,10 @@ A pure implementation of the Monte Carlo Tree Search (MCTS)
 @author: Junxiao Song
 """
 
-import numpy as np
 import copy
 from operator import itemgetter
+
+import numpy as np
 
 
 def rollout_policy_fn(board):
@@ -21,7 +22,7 @@ def policy_value_fn(board):
     """a function that takes in a state and outputs a list of (action, probability)
     tuples and a score for the state"""
     # return uniform probabilities and 0 score for pure MCTS
-    action_probs = np.ones(len(board.availables))/len(board.availables)
+    action_probs = np.ones(len(board.availables)) / len(board.availables)
     return zip(board.availables, action_probs), 0
 
 
@@ -52,8 +53,9 @@ class TreeNode(object):
         plus bonus u(P).
         Return: A tuple of (action, next_node)
         """
-        return max(self._children.items(),
-                   key=lambda act_node: act_node[1].get_value(c_puct))
+        return max(
+            self._children.items(), key=lambda act_node: act_node[1].get_value(c_puct)
+        )
 
     def update(self, leaf_value):
         """Update node values from leaf evaluation.
@@ -63,7 +65,7 @@ class TreeNode(object):
         # Count visit.
         self._n_visits += 1
         # Update Q, a running average of values for all visits.
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self._Q += 1.0 * (leaf_value - self._Q) / self._n_visits
 
     def update_recursive(self, leaf_value):
         """Like a call to update(), but applied recursively for all ancestors.
@@ -80,8 +82,9 @@ class TreeNode(object):
         c_puct: a number in (0, inf) controlling the relative impact of
             value Q, and prior probability P, on this node's score.
         """
-        self._u = (c_puct * self._P *
-                   np.sqrt(self._parent._n_visits) / (1 + self._n_visits))
+        self._u = (
+            c_puct * self._P * np.sqrt(self._parent._n_visits) / (1 + self._n_visits)
+        )
         return self._Q + self._u
 
     def is_leaf(self):
@@ -141,7 +144,7 @@ class MCTS(object):
         and 0 if it is a tie.
         """
         player = state.get_current_player()
-        for i in range(limit):
+        for _ in range(limit):
             end, winner = state.game_end()
             if end:
                 break
@@ -151,10 +154,10 @@ class MCTS(object):
         else:
             # If no break from the loop, issue a warning.
             print("WARNING: rollout reached move limit")
-        if winner == -1:  # tie
-            return 0
+        if winner is None:  # tie
+            return 0.0
         else:
-            return 1 if winner == player else -1
+            return 1.0 if winner == player else -1.0
 
     def get_move(self, state):
         """Runs all playouts sequentially and returns the most visited action.
@@ -165,8 +168,9 @@ class MCTS(object):
         for n in range(self._n_playout):
             state_copy = copy.deepcopy(state)
             self._playout(state_copy)
-        return max(self._root._children.items(),
-                   key=lambda act_node: act_node[1]._n_visits)[0]
+        return max(
+            self._root._children.items(), key=lambda act_node: act_node[1]._n_visits
+        )[0]
 
     def update_with_move(self, last_move):
         """Step forward in the tree, keeping everything we already know
@@ -182,25 +186,27 @@ class MCTS(object):
         return "MCTS"
 
 
-class MCTSPlayer(object):
+class MCTSPurePlayer(object):
     """AI player based on MCTS"""
+
     def __init__(self, c_puct=5, n_playout=1000):
         self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
+        self.id = None
 
-    def set_player_ind(self, p):
-        self.player = p
+    def set_id(self, id):
+        self.id = id
 
     def reset_player(self):
-        self.mcts.update_with_move(-1)
+        self.mcts.update_with_move(None)
 
     def get_action(self, board):
         sensible_moves = board.availables
         if len(sensible_moves) > 0:
             move = self.mcts.get_move(board)
-            self.mcts.update_with_move(-1)
-            return move
+            self.mcts.update_with_move(None)
+            return move, None
         else:
             print("WARNING: the board is full")
 
     def __str__(self):
-        return "MCTS {}".format(self.player)
+        return "MCTSPurePlayer {}".format(self.id)
