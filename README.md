@@ -49,6 +49,15 @@
 - check out AI gym
   - API, ...
 
+## setup
+
+```bash
+python -m venv venv
+. venv/bin/activate
+pip install torch==1.3.1+cpu torchvision==0.4.2+cpu -f https://download.pytorch.org/whl/torch_stable.html
+pip install -r requirements.txt
+```
+
 ## References
 
 - https://en.wikipedia.org/wiki/List_of_Go_terms
