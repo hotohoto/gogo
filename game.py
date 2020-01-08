@@ -7,6 +7,8 @@ from __future__ import print_function
 
 import numpy as np
 
+from config import Config
+
 
 class Board(object):
     """board for the game"""
@@ -135,6 +137,14 @@ class Game(object):
 
     def __init__(self, board, **kwargs):
         self.board = board
+
+    @staticmethod
+    def from_config(config: Config):
+        return Game(Board(
+            width=config.width,
+            height=config.height,
+            n_in_row=config.game_n_row
+        ))
 
     def graphic(self, board, player1, player2):
         """Draw the board and show game info"""

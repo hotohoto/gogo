@@ -4,7 +4,6 @@ from __future__ import print_function
 from config import Config
 from game import Board, Game
 from mcts_alphaZero import MCTSPlayer
-from mcts_pure import MCTSPlayer as MCTS_Pure
 from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 
 
@@ -36,7 +35,7 @@ class Human(object):
         return "Human {}".format(self.player)
 
 
-def run(config):
+def main(config):
     try:
         board = Board(width=config.width, height=config.height, n_in_row=config.game_n_row)
         game = Game(board)
@@ -45,12 +44,11 @@ def run(config):
         # load the trained policy_value_net in PyTorch
 
         best_policy = PolicyValueNet(config.width, config.height, model_file=config.model_file)
-        mcts_player = MCTSPlayer(best_policy.policy_value_fn,
-                                 c_puct=5,
-                                 n_playout=400)  # set larger n_playout for better performance
-
-        # uncomment the following line to play with pure MCTS (it's much weaker even with a larger n_playout)
-        # mcts_player = MCTS_Pure(c_puct=5, n_playout=1000)
+        mcts_player = MCTSPlayer(
+            best_policy.policy_value_fn,
+            c_puct=config.c_puct,
+            n_playout=config.n_playout,
+        )
 
         # human player, input your move in the format: 2,3
         human = Human()
@@ -62,4 +60,4 @@ def run(config):
 
 
 if __name__ == '__main__':
-    run(Config.from_args())
+    main(Config.from_args())
