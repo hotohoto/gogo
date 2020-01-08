@@ -1,5 +1,9 @@
 # GOGO
 
+## goal
+
+- elo 2000 which 1 kyu
+
 ## TODO
 
 (client)
@@ -48,3 +52,4 @@
 ## References
 
 - https://en.wikipedia.org/wiki/List_of_Go_terms
+- https://en.wikipedia.org/wiki/Go_ranks_and_ratings#Elo_ratings_as_used_in_Go
