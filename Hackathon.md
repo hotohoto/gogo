@@ -61,7 +61,18 @@ $$
 
 ## MCTS (Monte-Carlo Tree Search)
 
-
+- Selection
+  - start from root R and select successive child nodes until a leaf node L is reached.
+  - The root is the current game state and a leaf is any node from which no simulation (playout) has yet been initiated.
+  - The section below says more about a way of biasing choice of child nodes that lets the game tree expand towards the most promising moves, which is the essence of Monte Carlo tree search.
+- Expansion
+  - unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child nodes and choose node C from one of them. Child nodes are any valid moves from the game position defined by L.
+- Simulation
+  - complete one random playout from node C.
+  - This step is sometimes also called playout or rollout.
+  - A playout may be as simple as choosing uniform random moves until the game is decided.
+- Backpropagation
+  - use the result of the playout to update information in the nodes on the path from C to R.
 
 
 ## TODO
@@ -78,3 +89,4 @@ $$
 - [Lessons From Implementing AlphaZero parts 1~6](https://medium.com/oracledevs/lessons-from-implementing-alphazero-7e36e9054191)
 - [Monte Carlo Tree Search](https://www.youtube.com/watch?v=UXW2yZndl7U)
 - [AlphaGo Zero Explained In One Diagram](https://medium.com/applied-data-science/alphago-zero-explained-in-one-diagram-365f5abf67e0)
+- [MCTS on Wikipedia](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search)
