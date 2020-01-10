@@ -37,7 +37,7 @@ class Config:
 
     @staticmethod
     def get_datetime():
-        return datetime.today().strftime("%y%m%d%H%M%S")
+        return datetime.today().strftime("%Y%m%d%H%M%S")
 
     def get_current_model_name(self):
         return f"current_model_{self.width}_{self.height}_{self.game_n_row}.model"
