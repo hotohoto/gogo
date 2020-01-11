@@ -2,7 +2,8 @@
 from __future__ import print_function
 
 from config import Config
-from game import Board, Game
+from constants import PASS_MOVE
+from game import Game
 from mcts_alphaZero import MCTSPlayer
 from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 
@@ -12,52 +13,49 @@ class Human(object):
     human player
     """
 
-    def __init__(self):
-        self.id = None
+    def get_action(self, game_state):
 
-    def set_id(self, id):
-        self.id = id
+        str_input = None
+        while True:
+            str_input = input("Your move: ")
+            if str_input == "":
+                return PASS_MOVE, None
+            try:
+                move = str_input.split(",")
+                move = (int(move[0]), int(move[1]))
+            except Exception:  # pylint: disable=broad-except
+                print("invalid input")
+                continue
 
-    def get_action(self, board):
-        try:
-            location = input("Your move: ")
-            location = [int(n, 10) for n in location.split(",")]
-            move = board.location_to_move(location)
-        except Exception:  # pylint: disable=broad-except
-            move = None
-        if move is None or move not in board.availables:
-            print("invalid move")
-            move = self.get_action(board)
-        return move, None
+            if game_state.is_legal(move):
+                move = int(move[0]) * game_state.size + int(move[1])
+                print(move)
+                return move, None
+
+    def reset_player(self):
+        pass
 
     def __str__(self):
-        return "Human {}".format(self.id)
+        return "Human"
 
 
 def main(config):
     try:
-        board = Board(
-            width=config.width, height=config.height, n_in_row=config.game_n_row
-        )
-        game = Game(board)
+        game = Game.from_config(config)
 
         # ############### human VS AI ###################
         # load the trained policy_value_net in PyTorch
 
-        best_policy = PolicyValueNet(
-            config.width, config.height, model_file=config.model_file
-        )
+        best_policy = PolicyValueNet(config.size, model_file=config.model_file)
         mcts_player = MCTSPlayer(
-            best_policy.policy_value_fn,
-            c_puct=config.c_puct,
-            n_playout=config.n_playout,
+            best_policy, c_puct=config.c_puct, n_playout=config.n_playout,
         )
 
         # human player, input your move in the format: 2,3
         human = Human()
 
         # set start_player=0 for human first
-        game.start_play(human, mcts_player, start_player=0, display=1)
+        game.start_play(human, mcts_player, display=1)
     except KeyboardInterrupt:
         print("\n\rquit")
 

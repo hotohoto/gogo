@@ -1,29 +1,38 @@
 # -*- coding: utf-8 -*-
 """
 A pure implementation of the Monte Carlo Tree Search (MCTS)
-
-@author: Junxiao Song
 """
 
-import copy
 from operator import itemgetter
 
 import numpy as np
 
+import go
+from config import DEFAULT_PURE_MCTS_N_PLAYOUT
+from constants import PASS_MOVE
 
-def rollout_policy_fn(board):
+
+def _rollout_policy_fn(game_state: go.GameState):
     """a coarse, fast version of policy_fn used in the rollout phase."""
     # rollout randomly
-    action_probs = np.random.rand(len(board.availables))
-    return zip(board.availables, action_probs)
+    legal_moves = (
+        np.array(game_state.get_legal_moves(False)) @ np.array([game_state.size, 1])
+    ).tolist()
+    legal_moves = legal_moves + [PASS_MOVE]
+    action_probs = np.random.rand(len(legal_moves))
+    return zip(legal_moves, action_probs)
 
 
-def policy_value_fn(board):
+def _policy_value_fn(game_state: go.GameState):
     """a function that takes in a state and outputs a list of (action, probability)
     tuples and a score for the state"""
     # return uniform probabilities and 0 score for pure MCTS
-    action_probs = np.ones(len(board.availables)) / len(board.availables)
-    return zip(board.availables, action_probs), 0
+    legal_moves = (
+        np.array(game_state.get_legal_moves(False)) @ np.array([game_state.size, 1])
+    ).tolist()
+    legal_moves = legal_moves + [PASS_MOVE]
+    action_probs = np.ones(len(legal_moves)) / len(legal_moves)
+    return zip(legal_moves, action_probs), 0
 
 
 class TreeNode(object):
@@ -36,7 +45,6 @@ class TreeNode(object):
         self._children = {}  # a map from action to TreeNode
         self._n_visits = 0
         self._Q = 0
-        self._u = 0
         self._P = prior_p
 
     def expand(self, action_priors):
@@ -82,10 +90,8 @@ class TreeNode(object):
         c_puct: a number in (0, inf) controlling the relative impact of
             value Q, and prior probability P, on this node's score.
         """
-        self._u = (
-            c_puct * self._P * np.sqrt(self._parent._n_visits) / (1 + self._n_visits)
-        )
-        return self._Q + self._u
+        u = c_puct * self._P * np.sqrt(self._parent._n_visits) / (1 + self._n_visits)
+        return self._Q + u
 
     def is_leaf(self):
         """Check if leaf node (i.e. no nodes below this have been expanded).
@@ -99,7 +105,9 @@ class TreeNode(object):
 class MCTS(object):
     """A simple implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, policy_value_fn, c_puct=5, n_playout=10000):
+    def __init__(
+        self, policy_value_fn, c_puct=5, n_playout=DEFAULT_PURE_MCTS_N_PLAYOUT
+    ):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -110,64 +118,75 @@ class MCTS(object):
             relying on the prior more.
         """
         self._root = TreeNode(None, 1.0)
-        self._policy = policy_value_fn
+        self._policy_value_fn = policy_value_fn
         self._c_puct = c_puct
         self._n_playout = n_playout
 
-    def _playout(self, state):
+    def _playout(self, game_state):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
-        State is modified in-place, so a copy must be provided.
+        game_state is modified in-place, so a copy must be provided.
         """
         node = self._root
         while True:
             if node.is_leaf():
-
                 break
+
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            state.do_move(action)
+            if action == PASS_MOVE:
+                move = PASS_MOVE
+            else:
+                move = (action // game_state.size, action % game_state.size)
+            game_state.do_move(move)
 
-        action_probs, _ = self._policy(state)
         # Check for end of game
-        end, winner = state.game_end()
-        if not end:
+        if not game_state.is_end_of_game and len(game_state.get_legal_moves(False)) > 0:
+            action_probs, _ = self._policy_value_fn(game_state)
             node.expand(action_probs)
+
         # Evaluate the leaf node by random rollout
-        leaf_value = self._evaluate_rollout(state)
+        leaf_value = self._evaluate_rollout(game_state)
         # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def _evaluate_rollout(self, state, limit=1000):
+    def _evaluate_rollout(self, game_state: go.GameState, limit=1000):
         """Use the rollout policy to play until the end of the game,
         returning +1 if the current player wins, -1 if the opponent wins,
         and 0 if it is a tie.
         """
-        player = state.get_current_player()
+        player = game_state.current_player
         for _ in range(limit):
-            end, winner = state.game_end()
-            if end:
+            if game_state.is_end_of_game or len(game_state.get_legal_moves(False)) == 0:
                 break
-            action_probs = rollout_policy_fn(state)
+
+            action_probs = _rollout_policy_fn(game_state)
             max_action = max(action_probs, key=itemgetter(1))[0]
-            state.do_move(max_action)
+            if max_action == PASS_MOVE:
+                move = PASS_MOVE
+            else:
+                move = (max_action // game_state.size, max_action % game_state.size)
+            game_state.do_move(move)
         else:
             # If no break from the loop, issue a warning.
             print("WARNING: rollout reached move limit")
+        winner = game_state.get_winner()
         if winner is None:  # tie
             return 0.0
         else:
             return 1.0 if winner == player else -1.0
 
-    def get_move(self, state):
+    def get_move(self, game_state: go.GameState):
         """Runs all playouts sequentially and returns the most visited action.
-        state: the current game state
+        game_state: the current game state
 
         Return: the selected action
         """
-        for n in range(self._n_playout):
-            state_copy = copy.deepcopy(state)
+        for _ in range(self._n_playout):
+            state_copy = game_state.copy()
             self._playout(state_copy)
+        if self._root.is_leaf():
+            return PASS_MOVE
         return max(
             self._root._children.items(), key=lambda act_node: act_node[1]._n_visits
         )[0]
@@ -189,24 +208,19 @@ class MCTS(object):
 class MCTSPurePlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, c_puct=5, n_playout=1000):
-        self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
-        self.id = None
-
-    def set_id(self, id):
-        self.id = id
+    def __init__(self, c_puct=5, n_playout=DEFAULT_PURE_MCTS_N_PLAYOUT):
+        self.mcts = MCTS(_policy_value_fn, c_puct, n_playout)
 
     def reset_player(self):
         self.mcts.update_with_move(None)
 
-    def get_action(self, board):
-        sensible_moves = board.availables
-        if len(sensible_moves) > 0:
-            move = self.mcts.get_move(board)
+    def get_action(self, game_state: go.GameState):
+        if not game_state.is_end_of_game:
+            move = self.mcts.get_move(game_state)
             self.mcts.update_with_move(None)
             return move, None
         else:
-            print("WARNING: the board is full")
+            print("WARNING: game is end")
 
     def __str__(self):
-        return "MCTSPurePlayer {}".format(self.id)
+        return "MCTSPurePlayer"
