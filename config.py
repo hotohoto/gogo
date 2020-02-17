@@ -9,6 +9,7 @@ DEFAULT_KOMI_MAP = {
     7: 4.5,
     6: 3.5,
     5: 2.5,
+    4: 1.5,
     3: 0.5,
 }
 DEFAULT_ALPHA_ZERO_N_PLAYOUT = 10
