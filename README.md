@@ -4,7 +4,7 @@ a small project to mimic alphazero
 
 ## goal
 
-- elo 2000 which 1 kyu
+- elo 2000 which is 1 kyu
 
 ### Terms
 
@@ -21,6 +21,12 @@ a small project to mimic alphazero
 - eyeish
 
 ## TODO
+
+(questions)
+
+- how to train the model? what is the dataset like?
+  - softmax of n_visits for each children of root
+- how to control exploitation vs exporation trade-off
 
 (core)
 
@@ -80,6 +86,10 @@ pip install -r requirements.txt
 - plays against itself
 - no hard-coding except the game rules
 - but still there are a lot of hyper parameters
+- policy: 19x19 + 1
+  - possible stone placements
+  - pass move
+- each MCTS used 800 simulations
 
 ### Questions and answers
 
@@ -108,6 +118,14 @@ pip install -r requirements.txt
 - maintains a single network and it is updated continually
 - no rotating or flipping for data augmentation
 - hyperparameter were the same for different games
+
+### network architecture
+
+- body
+  - 19 residual blocks
+    - 256-conv-filter - BN - ReLU - 256-conv-filter - BN - skip connection - ReLU
+- policy head
+- value head
 
 ### Other AlphaZero details
 

@@ -3,9 +3,9 @@ from __future__ import print_function
 
 import numpy as np
 
-from constants import PASS_MOVE
 import go
 from config import Config
+from constants import PASS_MOVE
 
 
 class Game(object):
@@ -25,26 +25,53 @@ class Game(object):
         )
         return Game(game_state)
 
-    def print_board(self, game_state, player1_desc, player2_desc):
+    def print_board(self, game_state, player1_desc, player2_desc, move_probs=None):
         """Draw the board and show game info"""
 
         size = game_state.size
+        score_black, score_white = game_state.get_scores()
+
+        current_move_text = "*".center(8)
+        if game_state.history:
+            if game_state.history[-1] == PASS_MOVE:
+                last_move_text = "PASS"
+            else:
+                last_move_text = str(game_state.history[-1])
+        else:
+            last_move_text = ""
+        last_move_text = last_move_text.center(8)
 
         print(
             "Player BLACK with X",
-            "*" if game_state.current_player is go.BLACK else " ",
+            f"{score_black}".center(4),
+            current_move_text
+            if game_state.current_player is go.BLACK
+            else last_move_text,
             player1_desc,
         )
         print(
             "Player WHITE with O",
-            "*" if game_state.current_player is go.WHITE else " ",
+            f"{score_white}".center(4),
+            current_move_text
+            if game_state.current_player is go.WHITE
+            else last_move_text,
             player2_desc,
         )
+
+        if move_probs is not None:
+            for i in range(game_state.size):
+                for j in range(game_state.size):
+                    print(
+                        "{0:0.5f}".format(move_probs[i * game_state.size + j]), end=" "
+                    )
+                print()
+            print("pass move: {0:0.5f}".format(move_probs[-1]))
+
         print("\r\n   ", end="")
         for x in range(size):
             print("{0:5}".format(x), end="")
         print("\r\n")
-        for i in range(size - 1, -1, -1):
+        for i in range(size):
             print(f"{i}".center(5), end="")
             for j in range(size):
                 p = game_state.board[i][j]
@@ -78,7 +105,7 @@ class Game(object):
         while True:
             current_player_id = self.game_state.get_current_player()
             player_in_turn = players[current_player_id]
-            move, _ = player_in_turn.get_action(self.game_state)
+            move, move_probs = player_in_turn.get_action(self.game_state)
 
             if move == PASS_MOVE:
                 move = PASS_MOVE
@@ -87,7 +114,9 @@ class Game(object):
 
             is_end_of_game = self.game_state.do_move(move)
             if display:
-                self.print_board(self.game_state, str(black_player), str(white_player))
+                self.print_board(
+                    self.game_state, str(black_player), str(white_player), move_probs
+                )
             if is_end_of_game:
                 winner_id = self.game_state.get_winner()
                 if display:
@@ -97,7 +126,7 @@ class Game(object):
                         print("Game end. Tie")
                 return winner_id
 
-    def start_self_play(self, player, temp, display=False):
+    def start_self_play(self, player, display=False):
         """ start a self-play game using a MCTS player, reuse the search tree,
         and store the self-play data: (state, mcts_probs, z) for training
         """
@@ -106,7 +135,7 @@ class Game(object):
 
         states, mcts_probs, current_players = [], [], []
         while True:
-            move, move_probs = player.get_action(self.game_state, temp=temp)
+            move, move_probs = player.get_action(self.game_state)
 
             if move == PASS_MOVE:
                 move = PASS_MOVE
@@ -121,7 +150,7 @@ class Game(object):
             # perform a move
             is_game_end = self.game_state.do_move(move)
             if display:
-                self.print_board(self.game_state, str(player), str(player))
+                self.print_board(self.game_state, str(player), str(player), move_probs)
             if is_game_end:
                 winner_id = self.game_state.get_winner()
                 # winner from the perspective of the current player of each state
@@ -131,7 +160,10 @@ class Game(object):
                     winners_z[np.array(current_players) != winner_id] = -1.0
                 if display:
                     if winner_id is not None:
-                        print("Game end. Winner is player:", winner_id)
+                        print(
+                            "Game end. Winner is player:",
+                            "X" if winner_id == go.BLACK else "O",
+                        )
                     else:
                         print("Game end. Tie")
                 return winner_id, zip(states, mcts_probs, winners_z)

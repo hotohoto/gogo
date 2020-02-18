@@ -24,10 +24,9 @@ class TrainPipeline:
 
         # training params
 
-        self.temp = 2.0  # the temperature param
         self.buffer_size = 10000
-        self.min_data_to_collect = 512
-        self.batch_size = 512  # mini-batch size for training
+        self.min_data_to_collect = 128
+        self.batch_size = 128  # mini-batch size for training
         self.data_buffer = deque(maxlen=self.buffer_size)
 
         self.save_freq = 20
@@ -54,14 +53,47 @@ class TrainPipeline:
         n_game = 0
 
         while not len(self.data_buffer) > self.min_data_to_collect:
-            _, play_data = self.game.start_self_play(
-                self.mcts_player, temp=self.temp, display=False
-            )
+            _, play_data = self.game.start_self_play(self.mcts_player, display=True)
             play_data = [(data[0], data[1], data[2]) for data in play_data]
             self.data_buffer.extend(play_data)
             n_game += 1
 
         return len(self.data_buffer), n_game
+
+    def transform_data(self, board_input_batch, mcts_probs_batch):
+        """rotate or flip the original data"""
+        original_shape = (board_input_batch.shape, mcts_probs_batch.shape)
+
+        for i in range(board_input_batch.shape[0]):
+            n_rotate = np.random.randint(4)
+            flip = np.random.randint(2)
+
+            if not n_rotate or not flip:
+                continue
+
+            board_input = board_input_batch[i]
+            board_size = board_input.shape[0]
+            mcts_probs = mcts_probs_batch[i]
+            mcts_place_probs = np.reshape(
+                mcts_probs[0 : board_size * board_size], (board_size, board_size)
+            )
+            mcts_pass_move_prob = mcts_probs[-1]
+
+            if n_rotate:
+                board_input = np.rot90(board_input, n_rotate, axes=(1, 2))
+                mcts_place_probs = np.rot90(mcts_place_probs, n_rotate)
+            if flip:
+                board_input = board_input.T
+                mcts_place_probs = mcts_place_probs.T
+
+            np.put(board_input_batch, i, board_input)
+            np.put(
+                mcts_probs_batch, i, np.append(mcts_place_probs, mcts_pass_move_prob)
+            )
+
+        transformed_shape = (board_input_batch.shape, mcts_probs_batch.shape)
+        assert original_shape == transformed_shape
+        return board_input_batch, mcts_probs
 
     def policy_update(self):
         """update the policy-value net"""
@@ -75,9 +107,14 @@ class TrainPipeline:
                 )
             )
 
-            board_input_batch = [get_current_input(data[0]) for data in mini_batch]
-            mcts_probs_batch = [data[1] for data in mini_batch]
-            winner_batch = [data[2] for data in mini_batch]
+            board_input_batch = np.array(
+                [get_current_input(data[0]) for data in mini_batch]
+            )
+            mcts_probs_batch = np.array([data[1] for data in mini_batch])
+            winner_batch = np.array([data[2] for data in mini_batch])
+            board_input_batch, mcts_probs_batch = self.transform_data(
+                board_input_batch, mcts_probs_batch
+            )
 
             old_probs, old_v = self.policy_value_net.policy_value(board_input_batch)
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-from config import Config
+from config import Config, HUMAN_PLAY_TEMPERATURE
 from constants import PASS_MOVE
 from game import Game
 from mcts_alphaZero import MCTSPlayer
@@ -46,9 +46,12 @@ def main(config):
         # ############### human VS AI ###################
         # load the trained policy_value_net in PyTorch
 
-        best_policy = PolicyValueNet(config.size, model_file=config.model_file)
+        policy_value_net = PolicyValueNet(config.size, model_file=config.model_file)
         mcts_player = MCTSPlayer(
-            best_policy, c_puct=config.c_puct, n_playout=config.n_playout,
+            policy_value_net,
+            c_puct=config.c_puct,
+            n_playout=config.n_playout,
+            temperature=HUMAN_PLAY_TEMPERATURE,
         )
 
         # human player, input your move in the format: 2,3

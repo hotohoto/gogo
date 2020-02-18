@@ -519,11 +519,7 @@ class GameState(object):
                         self.__legal_eyes_cache.append((x, y))
         return self.get_legal_moves(include_eyes)
 
-    def get_winner(self):
-        """Calculate score of board state and return player ID (1, -1, or None for tie)
-        corresponding to winner. Uses 'Area scoring'.
-        """
-        # Count number of positions filled by each player, plus 1 for each eye-ish space owned
+    def get_scores(self):
         score_white = np.sum(self.board == WHITE)
         score_black = np.sum(self.board == BLACK)
         empties = zip(*np.where(self.board == EMPTY))
@@ -536,6 +532,16 @@ class GameState(object):
         score_white += self.komi
         score_white -= self.passes_white
         score_black -= self.passes_black
+        return score_black, score_white
+
+    def get_winner(self):
+        """Calculate score of board state and return player ID (1, -1, or None for tie)
+        corresponding to winner. Uses 'Area scoring'.
+        """
+        # Count number of positions filled by each player, plus 1 for each eye-ish space owned
+
+        score_black, score_white = self.get_scores()
+
         if score_black > score_white:
             winner = BLACK
         elif score_white > score_black:

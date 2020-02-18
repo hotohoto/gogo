@@ -12,9 +12,10 @@ from constants import PASS_MOVE
 
 torch.manual_seed(0)
 
-COMMON_CHANNEL = 32
-ACTION_CHANNEL = 16
-VALUE_CHANNEL = 16
+N_BODY_CHANNELS = 32  # 256 for AlphaZero
+N_BODY_RESIDUAL_BLOCKS = 4  # 19 for AlphaZero
+N_ACTION_HEAD_CHANNELS = 16
+N_VALUE_HEAD_CHANNELS = 16
 VALUE_HIDDEN_SIZE = 64
 
 
@@ -45,62 +46,63 @@ class Net(nn.Module):
         self.board_size = board_size
 
         # common layers
-        self.conv0 = nn.Conv2d(2, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv1 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv5 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv6 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv7 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(COMMON_CHANNEL, COMMON_CHANNEL, kernel_size=3, padding=1)
-
-        self.bn_conv0 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv1 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv2 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv3 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv4 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv5 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv6 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv7 = nn.BatchNorm2d(COMMON_CHANNEL)
-        self.bn_conv8 = nn.BatchNorm2d(COMMON_CHANNEL)
+        self.body_conv = []
+        self.body_bn = []
+        for i in range(N_BODY_RESIDUAL_BLOCKS * 2 + 1):
+            n_input_channels = 2 if i == 0 else N_BODY_CHANNELS
+            n_output_channels = N_BODY_CHANNELS
+            self.body_conv.append(
+                nn.Conv2d(n_input_channels, n_output_channels, kernel_size=3, padding=1)
+            )
+            self.body_bn.append(nn.BatchNorm2d(N_BODY_CHANNELS))
 
         # action policy layers
-        self.act_conv1 = nn.Conv2d(COMMON_CHANNEL, ACTION_CHANNEL, kernel_size=1)
-        self.act_bn_conv1 = nn.BatchNorm2d(ACTION_CHANNEL)
+        self.act_conv1 = nn.Conv2d(
+            N_BODY_CHANNELS, N_ACTION_HEAD_CHANNELS, kernel_size=1
+        )
+        self.act_bn_conv1 = nn.BatchNorm2d(N_ACTION_HEAD_CHANNELS)
         self.act_fc1 = nn.Linear(
-            ACTION_CHANNEL * board_size * board_size, board_size * board_size + 1
+            N_ACTION_HEAD_CHANNELS * board_size * board_size,
+            board_size * board_size + 1,
         )
 
         # state value layers
-        self.val_conv1 = nn.Conv2d(COMMON_CHANNEL, VALUE_CHANNEL, kernel_size=1)
-        self.val_bn_conv1 = nn.BatchNorm2d(VALUE_CHANNEL)
+        self.val_conv1 = nn.Conv2d(
+            N_BODY_CHANNELS, N_VALUE_HEAD_CHANNELS, kernel_size=1
+        )
+        self.val_bn_conv1 = nn.BatchNorm2d(N_VALUE_HEAD_CHANNELS)
         self.val_fc1 = nn.Linear(
-            VALUE_CHANNEL * board_size * board_size, VALUE_HIDDEN_SIZE
+            N_VALUE_HEAD_CHANNELS * board_size * board_size, VALUE_HIDDEN_SIZE
         )
         self.val_bn_fc1 = nn.BatchNorm1d(VALUE_HIDDEN_SIZE)
         self.val_fc2 = nn.Linear(VALUE_HIDDEN_SIZE, 1)
 
     def forward(self, state_input):
         # common layers
-        x0 = F.relu(self.bn_conv0(self.conv0(state_input)))
-        x1 = F.relu(self.bn_conv1(self.conv1(x0)))
-        x2 = F.relu(self.bn_conv2(self.conv2(x1)) + x0)
-        x3 = F.relu(self.bn_conv3(self.conv3(x2)))
-        x4 = F.relu(self.bn_conv4(self.conv4(x3)) + x2)
-        x5 = F.relu(self.bn_conv5(self.conv5(x4)))
-        x6 = F.relu(self.bn_conv6(self.conv6(x5)) + x4)
-        x7 = F.relu(self.bn_conv7(self.conv7(x6)))
-        x8 = F.relu(self.bn_conv8(self.conv8(x7)) + x6)
+        x1 = self.body_conv[0](state_input)
+        x2 = self.body_bn[0](x1)
+        x0 = F.relu(x2)
+
+        for i in range(N_BODY_RESIDUAL_BLOCKS):
+            x1 = self.body_conv[2 * i + 1](x0)
+            x2 = self.body_bn[2 * i + 1](x1)
+            x3 = F.relu(x2)
+            x4 = self.body_conv[2 * i + 2](x3)
+            x5 = self.body_bn[2 * i + 2](x4)
+            x0 = F.relu(x5 + x0)
 
         # action policy layers
-        x_act = F.relu(self.act_bn_conv1(self.act_conv1(x8)))
-        x_act = x_act.view(-1, ACTION_CHANNEL * self.board_size * self.board_size)
+        x_act = F.relu(self.act_bn_conv1(self.act_conv1(x0)))
+        x_act = x_act.view(
+            -1, N_ACTION_HEAD_CHANNELS * self.board_size * self.board_size
+        )
         x_act = F.log_softmax(self.act_fc1(x_act), dim=1)
 
         # state value layers
-        x_val = F.relu(self.act_bn_conv1(self.val_conv1(x8)))
-        x_val = x_val.view(-1, VALUE_CHANNEL * self.board_size * self.board_size)
+        x_val = F.relu(self.act_bn_conv1(self.val_conv1(x0)))
+        x_val = x_val.view(
+            -1, N_VALUE_HEAD_CHANNELS * self.board_size * self.board_size
+        )
         x_val = F.relu(self.val_bn_fc1(self.val_fc1(x_val)))
         x_val = torch.tanh(self.val_fc2(x_val))
 

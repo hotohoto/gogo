@@ -1,15 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
-Monte Carlo Tree Search in AlphaGo Zero style, which uses a policy-value
-network to guide the tree search and evaluate the leaf nodes
-
-@author: Junxiao Song
-"""
 
 import numpy as np
 
 import go
-from config import DEFAULT_ALPHA_ZERO_N_PLAYOUT
+from config import DEFAULT_ALPHA_ZERO_N_PLAYOUT, DEFAULT_TEMPERATURE
 from constants import PASS_MOVE
 
 
@@ -22,8 +16,7 @@ def softmax(x):
 class TreeNode(object):
     """A node in the MCTS tree.
 
-    Each node keeps track of its own value Q, prior probability P, and
-    its visit-count-adjusted prior score u.
+    Each node keeps track of its own value Q, prior probability P
     """
 
     def __init__(self, parent, prior_p):
@@ -91,7 +84,11 @@ class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
     def __init__(
-        self, policy_value_net, c_puct=5, n_playout=DEFAULT_ALPHA_ZERO_N_PLAYOUT
+        self,
+        policy_value_net,
+        c_puct=5,
+        temperature=DEFAULT_TEMPERATURE,
+        n_playout=DEFAULT_ALPHA_ZERO_N_PLAYOUT,
     ):
         """
         policy_value_net: network that takes in a board inputs and outputs
@@ -105,6 +102,7 @@ class MCTS(object):
         self._root = TreeNode(None, 1.0)
         self._policy_value_net = policy_value_net
         self._c_puct = c_puct
+        self._temperature = temperature
         self._n_playout = n_playout
 
     def _playout(self, game_state: go.GameState):
@@ -139,7 +137,7 @@ class MCTS(object):
         # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, game_state: go.GameState, temp=1e-3):
+    def get_move_probs(self, game_state: go.GameState):
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
         state: the current game state
@@ -157,7 +155,7 @@ class MCTS(object):
             (act, node._n_visits) for act, node in self._root._children.items()
         ]
         acts, visits = zip(*act_visits)
-        act_probs = softmax(1.0 / temp * np.log(np.array(visits) + 1e-10))
+        act_probs = softmax(1.0 / self._temperature * np.log(np.array(visits) + 1e-10))
 
         return acts, act_probs
 
@@ -182,23 +180,24 @@ class MCTSPlayer(object):
         self,
         policy_value_net,
         c_puct=5,
+        temperature=1,
         n_playout=DEFAULT_ALPHA_ZERO_N_PLAYOUT,
         is_selfplay=False,
     ):
-        self.mcts = MCTS(policy_value_net, c_puct, n_playout)
+        self.mcts = MCTS(policy_value_net, c_puct, temperature, n_playout)
         self._is_selfplay = is_selfplay
 
     def reset_player(self):
         self.mcts.update_with_move(None)
 
-    def get_action(self, game_state, temp=1e-3):
+    def get_action(self, game_state):
         self.mcts._policy_value_net.set_eval_mode()
 
         # the pi vector returned by MCTS as in the alphaGo Zero paper
         n_all_actions = game_state.size ** 2 + 1
 
         if not game_state.is_end_of_game:
-            acts, probs = self.mcts.get_move_probs(game_state, temp)
+            acts, probs = self.mcts.get_move_probs(game_state)
             if acts is None:
                 dense_probs = np.zeros(n_all_actions)
                 dense_probs[-1] = 1
@@ -207,11 +206,10 @@ class MCTSPlayer(object):
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
-                move = np.random.choice(
-                    acts,
-                    p=0.75 * probs
-                    + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs))),
+                modified_probs = 0.75 * probs + 0.25 * np.random.dirichlet(
+                    0.3 * np.ones(len(probs))
                 )
+                move = np.random.choice(acts, p=modified_probs)
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move)
             else:
