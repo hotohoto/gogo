@@ -19,23 +19,14 @@ a small project to mimic alphazero
 - eye
   - single liberty
 - eyeish
+- komi or komidashi
+  - points added to the score of the player with the white stones as compensation for playing second
 
 ## TODO
 
-(questions)
-
-- how to train the model? what is the dataset like?
-  - softmax of n_visits for each children of root
-- how to control exploitation vs exporation trade-off
-
 (core)
 
-- start with 3 by 3 board
-- rotate/flip and generate more data
 - Add TensorBoardX
-- show pass move in console board
-- show socre in console board
-- show probability after play a move
 
 (server)
 
@@ -70,7 +61,7 @@ a small project to mimic alphazero
   - time machine
     - with slide bar
 
-## setup
+## Setup development environment
 
 ```bash
 python -m venv venv
@@ -102,6 +93,10 @@ pip install -r requirements.txt
   - no
 - when the network is used?
   - For a leaf nodes to decide the value of the node and the probability of its children expanding the node
+- how to train the model? what is the dataset like?
+  - softmax of n_visits for each children of root
+- how to control exploitation vs exploration trade-off?
+  - the higher temperature the more exploration
 
 ### Comparing to AlphaGoZero
 
@@ -119,7 +114,7 @@ pip install -r requirements.txt
 - no rotating or flipping for data augmentation
 - hyperparameter were the same for different games
 
-### network architecture
+### Network architecture
 
 - body
   - 19 residual blocks
@@ -205,6 +200,11 @@ $$
 - Backpropagation
   - use the result of the playout to update information in the nodes on the path from C to R.
 
+## Discussion
+
+- network doesn't know how many stones for each team were passed away
+  - it's difficult to predict if it's gonna win or lose just by seeing the current stones on the board
+
 ## References
 
 - [List of Go terms](https://en.wikipedia.org/wiki/List_of_Go_terms)
@@ -214,7 +214,7 @@ $$
 - [MCTS in alphazero](https://medium.com/@jonathan_hui/monte-carlo-tree-search-mcts-in-alphago-zero-8a403588276a)
 - [A simple alphazero tutorial](https://web.stanford.edu/~surag/posts/alphazero.html)
 - [Lessons From Implementing AlphaZero parts 1~6](https://medium.com/oracledevs/lessons-from-implementing-alphazero-7e36e9054191)
-
+- [AlphaZero Gomoku (original source code)](https://github.com/junxiaosong/AlphaZero_Gomoku)
 - [Monte Carlo Tree Search](https://www.youtube.com/watch?v=UXW2yZndl7U)
 - [AlphaGo Zero Explained In One Diagram](https://medium.com/applied-data-science/alphago-zero-explained-in-one-diagram-365f5abf67e0)
 - [MCTS on Wikipedia](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search)
